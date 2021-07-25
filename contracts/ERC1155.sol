@@ -76,11 +76,6 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         // MUST emit event
         emit TransferSingle(msg.sender, _from, _to, _id, _value);
 
-        // Now that the balance is updated and the event was emitted,
-        // call onERC1155Received if the destination is a contract.
-        if (_to.isContract()) {
-            _doSafeTransferAcceptanceCheck(msg.sender, _from, _to, _id, _value, _data);
-        }
     }
 
     /**
@@ -124,11 +119,6 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         // MUST emit event
         emit TransferBatch(msg.sender, _from, _to, _ids, _values);
 
-        // Now that the balances are updated and the events are emitted,
-        // call onERC1155BatchReceived if the destination is a contract.
-        if (_to.isContract()) {
-            _doSafeBatchTransferAcceptanceCheck(msg.sender, _from, _to, _ids, _values, _data);
-        }
     }
 
     /**
