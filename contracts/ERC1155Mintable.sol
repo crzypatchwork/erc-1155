@@ -1,5 +1,7 @@
 pragma solidity ^0.5.0;
 
+pragma experimental ABIEncoderV2;
+
 import "./ERC1155.sol";
 
 contract ERC1155Mintable is ERC1155 {
@@ -10,33 +12,18 @@ contract ERC1155Mintable is ERC1155 {
         uint256 royalties;
     }
     
-    bytes4 constant private INTERFACE_SIGNATURE_URI = 0x0e89341c;
-
     mapping (uint256 => address) public creators;
     mapping (uint256 => Royalties) public royalties;
     
     uint256 public nonce;
 
-    modifier creatorOnly(uint256 _id) {
-        require(creators[_id] == msg.sender);
-        _;
+    function royaltiesView(uint256 _id) external view returns(Royalties memory) {
+        return royalties[_id];
     }
 
-    function supportsInterface(bytes4 _interfaceId)
-    public
-    view
-    returns (bool) {
-        if (_interfaceId == INTERFACE_SIGNATURE_URI) {
-            return true;
-        } else {
-            return super.supportsInterface(_interfaceId);
-        }
-    }
-
-    
     function mint(uint256 _initialSupply, uint256 _royalties, string calldata _uri) external returns(uint256 _id) {
 
-        require(_royalties >= 0 && _royalties <= 25);
+        require(_royalties >= 0 && _royalties <= 250 && _initialSupply > 0 && _initialSupply <= 10000);
         
         _id = ++nonce;
         creators[_id] = msg.sender;
