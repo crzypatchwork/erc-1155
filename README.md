@@ -1,5 +1,5 @@
 # ERC-1155 Reference Implementation
-www.enjincoin.io
+
 
 [EIP-1155 issue thread](https://github.com/ethereum/EIPs/issues/1155)
 
