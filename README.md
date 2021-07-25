@@ -2,8 +2,9 @@
 
 
 [EIP-1155 issue thread](https://github.com/ethereum/EIPs/issues/1155)
+[RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986)
 
 ```
-0x112dA58b9d7B6079522B448ca820B1E43680D400
+0xE2D2E422142748B59a734058c7d63c97345ffBD8
 ```
 
