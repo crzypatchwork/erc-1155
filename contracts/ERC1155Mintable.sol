@@ -9,12 +9,6 @@ contract ERC1155Mintable is ERC1155 {
     mapping (uint256 => address) public creators;
 
     uint256 public nonce;
-    
-    address manager;
-    
-    constructor(address _manager) public {
-        manager = _manager;
-    }
 
     modifier creatorOnly(uint256 _id) {
         require(creators[_id] == msg.sender);
@@ -32,22 +26,14 @@ contract ERC1155Mintable is ERC1155 {
         }
     }
 
-    function updateManager(address _manager) public {
-        require(msg.sender == manager);
-        manager = _manager;
-    }
     
-    // Creates a new token type and assings _initialSupply to minter
-    function mint(address _target, uint256 _initialSupply, string calldata _uri) external returns(uint256 _id) {
+    function mint(uint256 _initialSupply, string calldata _uri) external returns(uint256 _id) {
 
-        require(msg.sender == manager);
-        
         _id = ++nonce;
-        creators[_id] = _target;
-        balances[_id][_target] = _initialSupply;
+        creators[_id] = msg.sender;
+        balances[_id][msg.sender] = _initialSupply;
 
-        // Transfer event with mint semantic
-        emit TransferSingle(_target, address(0x0), _target, _id, _initialSupply);
+        emit TransferSingle(msg.sender, address(0x0), msg.sender, _id, _initialSupply);
 
         if (bytes(_uri).length > 0)
             emit URI(_uri, _id);
