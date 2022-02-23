@@ -439,16 +439,16 @@ abstract contract ERC1155 is IERC1155, ERC165, CommonConstants
     }
 }
 
+struct Royalties {
+    address issuer;
+    uint256 royalties;
+}
+
 contract ERC1155Mintable is ERC1155 {
 
     bytes4 private constant _INTERFACE_ID_ROYALTIES_EIP2981 = 0x2a55205a;
     bytes4 private constant _INTERFACE_ID_ERC1155 = 0xd9b67a26;
     bytes4 private constant _INTERFACE_SIGNATURE_ERC165 = 0x01ffc9a7;
-
-    struct Royalties {
-        address issuer;
-        uint256 royalties;
-    }
     
     mapping (uint256 => address) public creators;
     mapping (uint256 => uint256) public royalties;
@@ -457,10 +457,9 @@ contract ERC1155Mintable is ERC1155 {
     uint public nonce;
     string public name;
     string public symbol;
-    address public manager;
 
-    constructor (string memory _name, string memory _symbol, address _manager) public {
-        name = _name; symbol = _symbol; manager = _manager;
+    constructor (string memory _name, string memory _symbol) public {
+        name = _name; symbol = _symbol;
     }
 
     function mint(uint256 _initialSupply, uint256 _royalties, string memory _tokenUri) public returns(uint256 _id) {
@@ -496,3 +495,4 @@ contract ERC1155Mintable is ERC1155 {
     }
 
 }
+
