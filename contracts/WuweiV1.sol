@@ -35,15 +35,30 @@ interface ERC1155Interface {
             
 }
 
+interface ERC20Interface {
+    function transfer(address, uint256) external returns (bool);
+    function transferFrom(address, address, uint256) external returns (bool);
+}
+
 struct SwapStructV1 {
     
     address erc1155;
-    address issuer; // msg.sender swap issuer
+    address issuer; // swap issuer as msg.sender
     uint256 amount;
     uint256 value;
     uint256 tokenId;
     bool active;
     
+}
+
+struct SwapStructV2 {
+
+    address erc20;
+    address issuer;
+    uint256 amount;
+    uint256 value;
+    bool active;
+
 }
 
 // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.5.0/contracts/security/ReentrancyGuard.sol
@@ -69,35 +84,26 @@ contract ReEntrancyGuard {
     }
 }
 
-contract WuweiV1 {
+contract WuweiV1 is ReEntrancyGuard {
     
     event swapLog(address erc1155, uint256 amount, uint256 value, uint256 tokenId, uint256 op, uint256 indexed swapId);
 
     uint256 public nonce;
-    mapping(uint256 => SwapStructV1) public swaps;
-    address public manager;
     uint256 public fee;
+    address public manager;
+    mapping(uint256 => SwapStructV1) public swaps;
 
-    constructor(address _manager, uint256 _fee) public {
-        manager = _manager;
-        fee = _fee; // 250 ?
-    }
+    constructor(address _manager, uint256 _fee) public { manager = _manager; fee = _fee; }
     
     // management
     
-    function updateFee(uint256 _fee) public {
-        require(msg.sender == manager);
-        fee = _fee;
-    }
+    function updateFee(uint256 _fee) public { require(msg.sender == manager); fee = _fee; }
     
-    function updateManager(address _manager) public {
-        require(msg.sender == manager);
-        manager = _manager;
-    }
+    function updateManager(address _manager) public { require(msg.sender == manager); manager = _manager; }
     
     // erc1155 approval must be given
     
-    function swap(uint256 _id, uint256 _amount, uint256 _value, address _erc1155) public {
+    function swap(uint256 _id, uint256 _amount, uint256 _value, address _erc1155) public nonReentrant {
         
         require(((_value == 0) || (_value >= 10000)) && ((_amount > 0) && (_amount <= 10000)));
 
@@ -114,8 +120,8 @@ contract WuweiV1 {
 
     }
     
-    function cancelSwap(uint256 _swapId) public {
-        require((swaps[_swapId].issuer == msg.sender) &&(swaps[_swapId].active));
+    function cancelSwap(uint256 _swapId) public nonReentrant {
+        require((swaps[_swapId].issuer == msg.sender) && (swaps[_swapId].active));
         
         // mapping
         swaps[_swapId].active = false;
@@ -131,7 +137,7 @@ contract WuweiV1 {
         emit swapLog(swaps[_swapId].erc1155, _amount, 0, swaps[_swapId].tokenId, 2, _swapId);
     }
     
-    function collect(uint256 _swapId, uint256 _amount) public payable {
+    function collect(uint256 _swapId, uint256 _amount) public payable nonReentrant {
         
         require(
             (swaps[_swapId].amount > 0) && 
@@ -159,18 +165,16 @@ contract WuweiV1 {
                 (address creator, uint256 royalties) = ERC1155Interface(swaps[_swapId].erc1155).royaltyInfo(swaps[_swapId].tokenId, msg.value);
 
                 // royalties, management fees and market value distribution
-    
+                if (fee != 0) manager.call{ value : auxFee }("");    
                 creator.call{ value : royalties }("");
-                manager.call{ value : auxFee }("");
                 swaps[_swapId].issuer.call{ value : msg.value - (royalties + auxFee) }("");
 
             } else {
 
-                manager.call{ value : auxFee }("");
+                if (fee != 0) manager.call{ value : auxFee }("");
                 swaps[_swapId].issuer.call{ value : msg.value - auxFee }("");
 
             }
-
 
         }
         
@@ -183,3 +187,93 @@ contract WuweiV1 {
     
 }
 
+contract WuweiV21 is ReEntrancyGuard {
+
+    event swapLog(address erc20, uint256 amount, uint256 value, uint256 op, uint256 indexed swapId);
+
+    uint256 public nonce;
+    mapping (uint256 => SwapStructV2) public swaps;
+
+    function offer (address _erc20, uint256 _amount) public payable {
+        require(_amount >= 10000 && msg.value >= 10000);        
+        nonce++;
+        swaps[nonce] = SwapStructV2(_erc20, msg.sender, _amount, msg.value, true);
+
+    }
+
+}
+
+contract WuweiV2 is ReEntrancyGuard {
+
+    event swapLog(address erc20, uint256 amount, uint256 value, uint256 op, uint256 indexed swapId);
+
+    uint256 public nonce;
+    mapping (uint256 => SwapStructV2) public swaps;
+
+    function swap (address _erc20, uint256 _amount, uint256 _value) public nonReentrant {
+        nonce++;
+        swaps[nonce] = SwapStructV2(_erc20, msg.sender, _amount, _value, true);
+        require(ERC20Interface(_erc20).transferFrom(msg.sender, address(this), _amount));
+        emit swapLog(_erc20, _amount, _value, 0, nonce);
+    }
+
+    function fill (uint256 _swapId, uint256 _amount) public payable nonReentrant {
+        require(
+            (swaps[_swapId].active) &&
+            (msg.sender == swaps[_swapId].issuer) && 
+            (_amount <= swaps[_swapId].amount) &&
+            (msg.value <= swaps[_swapId].value) && 
+            (msg.value == ((swaps[_swapId].value * _amount) / swaps[_swapId].amount))
+            );
+
+        swaps[_swapId].amount -= _amount;
+        swaps[_swapId].value -= msg.value;
+        if (swaps[_swapId].amount == 0) swaps[_swapId].active = false;
+
+        require(ERC20Interface(swaps[_swapId].erc20).transfer(msg.sender, _amount));
+        swaps[_swapId].issuer.call{ value : msg.value }("");
+
+        emit swapLog(swaps[_swapId].erc20, _amount, msg.value, 1, _swapId);
+    }
+
+    function cancelSwap (uint256 _swapId) public nonReentrant {
+        require(swaps[_swapId].active && msg.sender == swaps[_swapId].issuer);
+        swaps[_swapId].active = false;
+
+        uint256 _amount = swaps[_swapId].amount;
+        swaps[_swapId].amount = 0;
+
+        require(ERC20Interface(swaps[_swapId].erc20).transfer(address(this), _amount));
+
+        emit swapLog(swaps[_swapId].erc20, _amount, 0, 2, _swapId);
+    }
+
+}
+
+interface IWuwei { function fill (uint256, uint256) external payable; }
+
+struct Order {
+    address erc20;
+    uint256 swapId;
+    uint256 amount;
+    uint256 value;
+}
+
+contract AggregatorV2 is ReEntrancyGuard {
+
+    function multiOrder(Order[] calldata _orders, address _target) public payable nonReentrant {
+
+        uint256 sum;
+
+        for (uint256 i; i < _orders.length; i++) { sum += _orders[i].value; }
+
+        require(msg.value == sum);
+
+        for (uint256 i; i < _orders.length; i++) {
+            IWuwei(_target).fill{ value : _orders[i].value }(_orders[i].swapId, _orders[i].amount);
+            require(ERC20Interface(_orders[i].erc20).transfer(msg.sender, _orders[i].amount));
+        }
+
+    }
+
+}

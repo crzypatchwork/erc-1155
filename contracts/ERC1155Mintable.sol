@@ -457,9 +457,11 @@ contract ERC1155Mintable is ERC1155 {
     uint public nonce;
     string public name;
     string public symbol;
+    string public collectionUri = "ipfs://QmQ5j4yPAPoCJLWVQvLJRHASXuTGzSRajByByMuL1odZoZ";
 
     constructor (string memory _name, string memory _symbol) public {
-        name = _name; symbol = _symbol;
+        name = _name; 
+        symbol = _symbol; 
     }
 
     function mint(uint256 _initialSupply, uint256 _royalties, string memory _tokenUri) public returns(uint256 _id) {
@@ -490,9 +492,6 @@ contract ERC1155Mintable is ERC1155 {
 
     // https://docs.opensea.io/docs/contract-level-metadata
 
-    function contractURI() public view returns (string memory) {
-        return "ipfs://QmQ5j4yPAPoCJLWVQvLJRHASXuTGzSRajByByMuL1odZoZ";
-    }
+    function contractURI() public view returns (string memory) { return collectionUri; }
 
 }
-
