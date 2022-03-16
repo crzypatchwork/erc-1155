@@ -11,7 +11,7 @@ pragma experimental ABIEncoderV2;
 //          @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 /**
- * @title SafeMathƒ
+ * @title SafeMath
  * @dev Math operations with safety checks that throw on error
  */
 library SafeMath {
@@ -259,17 +259,27 @@ interface ERC165 {
     returns (bool);
 }
 
+// https://docs.opensea.io/docs/metadata-standards#freezing-metadata
+// event only. see freezeURI and editURI functions on ERC1155 Mintable.
+
+contract Multable {
+    event PermanentURI(string _value, uint256 indexed _id);
+}
+
 struct Royalties {
     address issuer;
     uint256 royalties;
 }
 
-contract ERC1155 is IERC1155, ERC165, CommonConstants
+contract ERC1155 is IERC1155, ERC165, CommonConstants, Multable
 {
     using SafeMath for uint256;
     using Address for address;
 
+    // id => (owner => balance)
     mapping (uint256 => mapping(address => uint256)) internal balances;
+
+    // owner => (operator => approved)
     mapping (address => mapping(address => bool)) internal operatorApproval;
 
 /////////////////////////////////////////// ERC165 //////////////////////////////////////////////
@@ -440,6 +450,7 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
         require(ERC1155TokenReceiver(_to).onERC1155BatchReceived(_operator, _from, _ids, _values, _data) == ERC1155_BATCH_ACCEPTED, "contract returned an unknown value from onERC1155BatchReceived");
     }
 
+
     bytes4 private constant _INTERFACE_ID_ROYALTIES_EIP2981 = 0x2a55205a;
     bytes4 private constant _INTERFACE_ID_ERC1155 = 0xd9b67a26;
     bytes4 private constant _INTERFACE_SIGNATURE_ERC165 = 0x01ffc9a7;
@@ -447,7 +458,8 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
     mapping (uint256 => address) public creators;
     mapping (uint256 => uint256) public royalties;
     mapping (uint256 => string) public uri;
-
+    mapping (uint256 => bool) public frozen;
+    
     uint public nonce;
     string public name = "\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88";
     string public symbol = "\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88";
@@ -483,5 +495,31 @@ contract ERC1155 is IERC1155, ERC165, CommonConstants
 
     function contractURI() public view returns (string memory) { return collectionUri; }
 
+    // Multable
+
+    function editURI(string memory _tokenUri, uint256 _id) public {
+        require(msg.sender == creators[_id] && !frozen[_id]);
+        uri[_id] = _tokenUri;
+        emit URI(_tokenUri, _id);
+    }
+
+    function freezeURI(uint256 _id) public {
+        require(msg.sender == creators[_id] && !frozen[_id]);
+        frozen[_id] = true;
+        emit PermanentURI(uri[_id], _id);
+    }
+
 }
 
+contract Ownable {
+
+    mapping (address => bool) public auths;
+
+    constructor () public { auths[msg.sender] = true; }
+
+    modifier auth () { require(auths[msg.sender]); _; }
+
+    function addAuth(address _address) public { require(auths[msg.sender]); auths[_address] = true; }
+    function removeAuth(address _address) public { require(auths[msg.sender]); delete auths[_address]; }
+
+}

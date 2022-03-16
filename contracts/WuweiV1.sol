@@ -85,7 +85,9 @@ contract ReEntrancyGuard {
 }
 
 contract WuweiV1 is ReEntrancyGuard {
-    
+
+    bytes4 private constant _INTERFACE_ID_ROYALTIES_EIP2981 = 0x2a55205a;
+
     event swapLog(address erc1155, uint256 amount, uint256 value, uint256 tokenId, uint256 op, uint256 indexed swapId);
 
     uint256 public nonce;
@@ -154,25 +156,25 @@ contract WuweiV1 is ReEntrancyGuard {
 
         if (swaps[_swapId].amount == 0) swaps[_swapId].active = false;
 
-        uint256 auxFee = ((fee * msg.value) / 10000);
+        uint256 _fee = ((fee * msg.value) / 10000);
 
         if (msg.value != 0) {
             
-            if (ERC1155Interface(swaps[_swapId].erc1155).supportsInterface(0x2a55205a)) {
+            if (ERC1155Interface(swaps[_swapId].erc1155).supportsInterface(_INTERFACE_ID_ROYALTIES_EIP2981)) {
 
                 // EIP2981
 
-                (address creator, uint256 royalties) = ERC1155Interface(swaps[_swapId].erc1155).royaltyInfo(swaps[_swapId].tokenId, msg.value);
+                (address _creator, uint256 _royalties) = ERC1155Interface(swaps[_swapId].erc1155).royaltyInfo(swaps[_swapId].tokenId, msg.value);
 
                 // royalties, management fees and market value distribution
-                if (fee != 0) manager.call{ value : auxFee }("");    
-                creator.call{ value : royalties }("");
-                swaps[_swapId].issuer.call{ value : msg.value - (royalties + auxFee) }("");
+                if (fee != 0) manager.call{ value : _fee }("");    
+                _creator.call{ value : _royalties }("");
+                swaps[_swapId].issuer.call{ value : msg.value - (_royalties + _fee) }("");
 
             } else {
 
-                if (fee != 0) manager.call{ value : auxFee }("");
-                swaps[_swapId].issuer.call{ value : msg.value - auxFee }("");
+                if (fee != 0) manager.call{ value : _fee }("");
+                swaps[_swapId].issuer.call{ value : msg.value - _fee }("");
 
             }
 
@@ -194,12 +196,14 @@ contract WuweiV21 is ReEntrancyGuard {
     uint256 public nonce;
     mapping (uint256 => SwapStructV2) public swaps;
 
-    function offer (address _erc20, uint256 _amount) public payable {
+    function swap (address _erc20, uint256 _amount) public payable {
         require(_amount >= 10000 && msg.value >= 10000);        
         nonce++;
         swaps[nonce] = SwapStructV2(_erc20, msg.sender, _amount, msg.value, true);
-
+        emit swapLog(_erc20, _amount, msg.value, 0, nonce);
     }
+
+
 
 }
 
